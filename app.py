@@ -239,7 +239,7 @@ if file:
                 nuevo, ok, motivo = validar_decimal(original)
             elif col in valores_validos:
                 nuevo, ok, motivo = validar_aproximado(original, valores_validos[col])
-            elif col in columnas_fecha:
+            elif col in [normalizar_columna(c) for c in columnas_fecha]:
                 nuevo, ok, motivo = validar_fecha(original)
             elif col == "comentarios":
                 nuevo = titulo_propio(original.lower())
