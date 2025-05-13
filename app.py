@@ -230,7 +230,16 @@ if file:
             st.markdown("📊 Cambios por columna:")
             st.dataframe(pd.DataFrame.from_dict(cambios_por_columna, orient="index", columns=["Cantidad de cambios"]))
             st.markdown("📝 Detalle de cambios:")
-            st.dataframe(pd.DataFrame(corregidos, columns=["Fila", "Columna", "Valor original", "Valor corregido"]))
+        st.dataframe(pd.DataFrame(
+            corregidos,
+            columns=["Fila", "Columna", "Valor original", "Valor corregido"]
+        ))
+
+    if errores or corregidos:
+        st.markdown("### 👁️ Vista previa de celdas modificadas")
+        vista_previa = errores + corregidos
+        vista_df = pd.DataFrame(vista_previa, columns=["Fila", "Columna", "Valor original", "Valor corregido"])
+        st.dataframe(vista_df)
         else:
             st.info("No se realizaron correcciones automáticas.")
 
