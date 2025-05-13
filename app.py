@@ -259,6 +259,12 @@ if file:
                 nuevo = mayusculas(original)
             elif col == "dominio":
                 nuevo = limpiar_dominio(original)
+                if nuevo in valores_unicos["dominio"]:
+                    cell.fill = rojo
+                    cell.font = blanco
+                    errores.append((cell.row, col_original, original, "Dominio duplicado"))
+                    continue
+                valores_unicos["dominio"].add(nuevo)
             elif col in ["marca", "modelo", "tipo de vehiculo", "grupo - base", "cia. seguros", "nombre del titular"]:
                 nuevo = titulo_propio(original)
             elif col in ["nro chasis", "nro motor", "nro póliza"]:
