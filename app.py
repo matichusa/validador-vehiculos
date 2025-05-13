@@ -82,6 +82,8 @@ file = st.file_uploader("Subí tu archivo de Excel para validar y corregir los d
 if file:
     wb = load_workbook(file)
     ws = wb.active
+    encabezado_fila = 5
+    encabezado = [str(c.value).strip() if c.value else "" for c in ws[encabezado_fila]]
 
     encabezado = [str(c.value).strip() if c.value else "" for c in ws[1]]
     errores = []
@@ -91,7 +93,7 @@ if file:
     fill_red = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
     font_white = Font(color="FFFFFF", bold=True)
 
-    for row in ws.iter_rows(min_row=2, max_row=ws.max_row, max_col=len(encabezado)):
+    for row in ws.iter_rows(min_row=encabezado_fila + 1, max_row=ws.max_row, max_col=len(encabezado)):
         for cell in row:
             col = encabezado[cell.column - 1].lower()
             original = cell.value
