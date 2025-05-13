@@ -40,7 +40,7 @@ def convertir_a_titulo(valor):
     return str(valor).strip().title()
 
 # ---------------- App Streamlit ----------------
-st.set_title("Validador de Archivo Excel - Vehículos")
+st.title("Validador de Archivo Excel - Vehículos")
 st.write("Subí tu archivo de Excel para validar y corregir los datos automáticamente.")
 
 file = st.file_uploader("Cargá el archivo Excel", type=[".xlsx"])
