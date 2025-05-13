@@ -1,176 +1,98 @@
-# Validador y corrector de Excel para carga de vehículos
-# Aplicación en Streamlit para facilitar su uso
-
+# Validador y corrector de Excel para carga de vehículos con estética preservada
 import streamlit as st
 import pandas as pd
-import numpy as np
 from io import BytesIO
 from difflib import get_close_matches
 from openpyxl import load_workbook
-from openpyxl.styles import Font, PatternFill
-from openpyxl.utils.dataframe import dataframe_to_rows
+from openpyxl.styles import PatternFill, Font
 
 # ---------------- Funciones de validación ----------------
 def limpiar_dominio(valor):
-    if pd.isna(valor):
-        return ""
-    return str(valor).replace(" ", "").replace("-", "").replace("/", "").upper()
+    if not isinstance(valor, str):
+        return valor
+    return valor.replace(" ", "").replace("-", "").replace("/", "").upper()
 
 def validar_aproximado(valor, opciones):
-    if pd.isna(valor):
-        return np.nan
-    valor_str = str(valor).strip().title()
-    match = get_close_matches(valor_str, opciones, n=1, cutoff=0.75)
-    return match[0] if match else "NO CORREGIDO"
+    if valor is None:
+        return valor, True
+    match = get_close_matches(str(valor).strip().title(), opciones, n=1, cutoff=0.75)
+    return (match[0], True) if match else (valor, False)
 
 def validar_entero(valor):
     try:
-        return int(float(valor)) if not pd.isna(valor) else np.nan
+        return int(float(valor)), True
     except:
-        return "NO CORREGIDO"
+        return valor, False
 
 def validar_fecha(valor):
-    if pd.isna(valor):
-        return np.nan
     try:
-        return pd.to_datetime(valor).strftime("%d/%m/%Y")
+        return pd.to_datetime(valor).strftime("%d/%m/%Y"), True
     except:
-        return "NO CORREGIDO"
+        return valor, False
 
-def convertir_a_titulo(valor):
-    if pd.isna(valor):
-        return valor
-    return str(valor).strip().title()
+# ---------------- Configuración ----------------
+valores_validos = {
+    "Combustible": ["Nafta", "Diésel", "Gas", "Eléctrico"],
+    "Med. Uso": ["Kilometros", "Millas", "Horas"],
+    "Estado": ["Asignado", "Disponible", "En Taller", "Fuera de Servicio"],
+    "Tipo de Cobertura": ["Terceros Completo Estandard", "Tercero Completo Premium", "Todo Riesgo"],
+    "Titularidad": ["Propio", "Alquilado", "Leasing", "Prendario"]
+}
+columnas_fecha = ["Vto Póliza", "Vto Cédula", "Vto VTV", "Vto Ruta", "Vto GNC", "Vto Cilindro GNC", "Vto Senasa"]
 
 # ---------------- App Streamlit ----------------
-st.title("Validador de Archivo Excel - Vehículos")
-st.write("Subí tu archivo de Excel para validar y corregir los datos automáticamente.")
-
-file = st.file_uploader("Cargá el archivo Excel", type=[".xlsx"])
+st.title("Validador de Archivo Excel - Estética Original")
+file = st.file_uploader("Subí el archivo Excel original", type=[".xlsx"])
 
 if file:
-    df = pd.read_excel(file, header=None)
-    header_row = df[df.apply(lambda row: row.astype(str).str.contains("Dominio").any(), axis=1)].index[0]
-    df = pd.read_excel(file, header=header_row)
+    wb = load_workbook(file)
+    ws = wb[wb.sheetnames[0]]
 
-    df_original = df.copy()  # Para comparación
+    encabezados = [cell.value for cell in ws[7]]  # Fila 8 (indexada desde 1)
+    col_map = {col: idx + 1 for idx, col in enumerate(encabezados)}
 
-    # Correcciones manuales
-    correcciones_manual = {
-        "Titularidad": {"Mio": "Propio"},
-        "Med. Uso": {"Kilometro": "Kilometros", "Kilómetro": "Kilometros", "km": "Kilometros"},
-        "Color": {"Amarillllo": "Amarillo", "amarillo": "Amarillo"}
-    }
+    errores = []
+    fill_red = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
+    font_white = Font(color="FFFFFF", bold=True)
 
-    opciones_validas = {
-        "Combustible": ["Nafta", "Diésel", "Gas", "Eléctrico"],
-        "Med. Uso": ["Kilometros", "Millas", "Horas"],
-        "Estado": ["Asignado", "Disponible", "En Taller", "Fuera de Servicio"],
-        "Tipo Cobertura": ["Terceros Completo Estandard", "Tercero Completo Premium", "Todo Riesgo"],
-        "Titularidad": ["Propio", "Alquilado", "Leasing", "Prendario"]
-    }
+    for row in ws.iter_rows(min_row=9, max_row=ws.max_row, max_col=len(encabezados)):
+        for col_name, col_idx in col_map.items():
+            cell = ws.cell(row=row[0].row, column=col_idx)
+            val = cell.value
 
-    fechas = ["Vto Póliza", "Vto Cédula", "Vto VTV", "Vto Ruta", "Vto GNC", "Vto Cilindro GNC", "Vto Senasa"]
-    columnas_sin_nan = ["Color", "Nro Chasis", "Nro Motor"]
+            if col_name == "Dominio" and isinstance(val, str):
+                nuevo = limpiar_dominio(val)
+                if nuevo != val:
+                    cell.value = nuevo
 
-    for col, reemplazos in correcciones_manual.items():
-        if col in df.columns:
-            df[col] = df[col].replace(reemplazos)
+            elif col_name in valores_validos:
+                nuevo, ok = validar_aproximado(val, valores_validos[col_name])
+                if not ok:
+                    cell.fill = fill_red
+                    cell.font = font_white
 
-    if "Dominio" in df.columns:
-        df["Dominio"] = df["Dominio"].apply(limpiar_dominio)
+            elif col_name in columnas_fecha:
+                _, ok = validar_fecha(val)
+                if not ok:
+                    cell.fill = fill_red
+                    cell.font = font_white
 
-    if "Codigo - Interno" in df.columns:
-        df["Codigo - Interno"] = df["Codigo - Interno"].astype(str).str.strip().str.upper()
+            elif col_name == "Odómetro":
+                _, ok = validar_entero(val)
+                if not ok:
+                    cell.fill = fill_red
+                    cell.font = font_white
 
-    for columna, opciones in opciones_validas.items():
-        if columna in df.columns:
-            df[columna] = df[columna].apply(lambda x: validar_aproximado(x, opciones))
-
-    for col in df.columns:
-        if col not in fechas and col not in {"Codigo - Interno", "Dominio"} and df[col].dtype == object:
-            df[col] = df[col].apply(convertir_a_titulo)
-
-    for col in fechas:
-        if col in df.columns:
-            df[col] = df[col].apply(validar_fecha)
-
-    if "Odómetro" in df.columns:
-        df["Odómetro"] = df["Odómetro"].apply(validar_entero)
-
-    for col in columnas_sin_nan:
-        if col in df.columns:
-            df[col] = df[col].apply(lambda x: "" if pd.isna(x) else x)
-
-    # Comparar cambios
-    cambios = (df != df_original) & ~(df.isna() & df_original.isna())
-    total_cambios = cambios.sum().sum()
-    columnas_con_cambios = cambios.sum()
-    resumen_cambios = df_original[cambios].copy()
-    resumen_cambios_nuevo = df[cambios].copy()
-    resumen = pd.DataFrame({
-        'Valor original': resumen_cambios.stack(),
-        'Valor corregido': resumen_cambios_nuevo.stack()
-    })
-
-    errores_no_corregidos = resumen[resumen['Valor corregido'] == "NO CORREGIDO"]
-    resumen_ok = resumen[resumen['Valor corregido'] != "NO CORREGIDO"]
-
-    with st.expander("📋 Ver resumen de cambios detectados"):
-        if not errores_no_corregidos.empty:
-            st.markdown("### ⚠️ Cambios no corregidos")
-            st.dataframe(errores_no_corregidos)
-
-        st.write(f"🔧 Total de celdas corregidas: **{total_cambios}**")
-        st.dataframe(columnas_con_cambios[columnas_con_cambios > 0])
-        if not resumen_ok.empty:
-            st.markdown("### ✅ Cambios realizados")
-            st.dataframe(resumen_ok)
-
-            # Agregar botón para descargar el log de cambios
-            output_log = BytesIO()
-            resumen.to_excel(output_log)
-            output_log.seek(0)
-            st.download_button(
-                label="Descargar log de cambios",
-                data=output_log,
-                file_name="log_cambios.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-
-    # Descargar archivo corregido con formato y hoja adicional de log
     output = BytesIO()
-    df.to_excel(output, index=False)
+    wb.save(output)
     output.seek(0)
-    wb = load_workbook(filename=output)
-    ws = wb.active
-
-    # Marcar errores en hoja principal (corregido)
-    for row_idx in range(df.shape[0]):
-        for col_idx in range(df.shape[1]):
-            val = df.iat[row_idx, col_idx]
-            if val == "NO CORREGIDO":
-                excel_row = row_idx + 2  # +2 por encabezado y 0-index
-                excel_col = col_idx + 1
-                cell = ws.cell(row=excel_row, column=excel_col)
-                cell.fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
-                cell.font = Font(color="FFFFFF", bold=True)
-
-    # Agregar hoja con el resumen de cambios
-    ws_log = wb.create_sheet(title="Log de Cambios")
-    for r in dataframe_to_rows(resumen.reset_index(), index=False, header=True):
-        ws_log.append(r)
-
-    corrected_output = BytesIO()
-    wb.save(corrected_output)
-    corrected_output.seek(0)
 
     st.download_button(
-        label="Descargar archivo corregido",
-        data=corrected_output,
-        file_name="vehiculos_corregido.xlsx",
+        label="📥 Descargar archivo validado",
+        data=output,
+        file_name="vehiculos_validado.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
-    st.success("Archivo procesado correctamente.")
+    st.success("Archivo validado conservando su estética.")
 
