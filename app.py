@@ -52,9 +52,6 @@ def validar_decimal(valor):
         return valor, False, "Número decimal inválido"
 
 def validar_fecha(valor):
-    return validar_fecha_robusta(valor)
-
-def validar_fecha_robusta(valor):
     try:
         if pd.isna(valor) or str(valor).strip() == "":
             return "", True, ""
