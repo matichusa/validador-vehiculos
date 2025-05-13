@@ -118,11 +118,9 @@ if file:
 
     encabezados = [str(cell.value).strip() if cell.value else "" for cell in ws[encabezado_fila - 1]]
     encabezados_normalizados = [e.lower().strip() for e in encabezados]
-    col_map = {col: idx for idx, col in enumerate(encabezados_normalizados)}
-
-                    errores = []
-        valores_unicos = {"dominio": set(), "código - interno": set()}
-                    corregidos = []
+    errores = []
+    valores_unicos = {"dominio": set(), "código - interno": set()}
+    corregidos = []
     cambios_por_columna = {}
     fill_red = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
     font_white = Font(color="FFFFFF", bold=True)
@@ -188,7 +186,6 @@ if file:
 
                     elif normalizar(col_name) in ["odometro", "odometros"]:
                         
-
                     elif normalizar(col_name) in valores_validos_extra:
                         nuevo, ok, motivo = validar_aproximado(val, valores_validos_extra[normalizar(col_name)])
                         if not ok:
