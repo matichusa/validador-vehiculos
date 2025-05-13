@@ -82,7 +82,7 @@ def validar_fecha(valor):
             return fecha.strftime("%d/%m/%Y"), True, ""
 
         if isinstance(valor, (pd.Timestamp, datetime)):
-            return valor.strftime("%d/%m/%Y"), True, ""
+            return pd.to_datetime(valor).strftime("%d/%m/%Y"), True, ""
 
         fecha = pd.to_datetime(valor, dayfirst=True, errors='raise')
         return fecha.strftime("%d/%m/%Y"), True, ""
@@ -94,7 +94,7 @@ def validar_fecha(valor):
             return "", True, ""
 
         if isinstance(valor, (pd.Timestamp, datetime)):
-            return valor.strftime("%d/%m/%Y"), True, ""
+            return pd.to_datetime(valor).strftime("%d/%m/%Y"), True, ""
 
         if isinstance(valor, str):
             val = valor.lower().strip()
@@ -129,7 +129,7 @@ def validar_fecha(valor):
             return "", True, ""
 
         if isinstance(valor, (pd.Timestamp, datetime)):
-            return valor.strftime("%d/%m/%Y"), True, ""
+            return pd.to_datetime(valor).strftime("%d/%m/%Y"), True, ""
 
         if isinstance(valor, str):
             val = valor.lower().strip()
@@ -167,7 +167,7 @@ def validar_fecha_robusta(valor):
             return valor, True, ""
         
         if isinstance(valor, (pd.Timestamp, datetime)):
-            return valor.strftime("%d/%m/%Y"), True, ""
+            return pd.to_datetime(valor).strftime("%d/%m/%Y"), True, ""
 
         if isinstance(valor, str):
             val = valor.lower().strip()
