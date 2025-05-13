@@ -33,13 +33,13 @@ def validar_fecha(valor):
 
 # ---------------- Configuración ----------------
 valores_validos = {
-    "Combustible": ["Nafta", "Diésel", "Gas", "Eléctrico"],
-    "Med. Uso": ["Kilometros", "Millas", "Horas"],
-    "Estado": ["Asignado", "Disponible", "En Taller", "Fuera de Servicio"],
-    "Tipo de Cobertura": ["Terceros Completo Estandard", "Tercero Completo Premium", "Todo Riesgo"],
-    "Titularidad": ["Propio", "Alquilado", "Leasing", "Prendario"]
+    "combustible": ["Nafta", "Diésel", "Gas", "Eléctrico"],
+    "med. uso": ["Kilometros", "Millas", "Horas"],
+    "estado": ["Asignado", "Disponible", "En Taller", "Fuera de Servicio"],
+    "tipo de cobertura": ["Terceros Completo Estandard", "Tercero Completo Premium", "Todo Riesgo"],
+    "titularidad": ["Propio", "Alquilado", "Leasing", "Prendario"]
 }
-columnas_fecha = ["Vto Póliza", "Vto Cédula", "Vto VTV", "Vto Ruta", "Vto GNC", "Vto Cilindro GNC", "Vto Senasa"]
+columnas_fecha = [c.lower() for c in ["Vto Póliza", "Vto Cédula", "Vto VTV", "Vto Ruta", "Vto GNC", "Vto Cilindro GNC", "Vto Senasa"]]
 
 # ---------------- App Streamlit ----------------
 st.title("Validador de Archivo Excel - Estética Original")
@@ -49,8 +49,21 @@ if file:
     wb = load_workbook(file)
     ws = wb[wb.sheetnames[0]]
 
-    encabezados = [cell.value for cell in ws[7]]
-    col_map = {col: idx for idx, col in enumerate(encabezados)}
+    # Buscar encabezado dinámicamente
+    encabezado_fila = None
+    for fila in ws.iter_rows(min_row=1, max_row=15):
+        valores = [str(cell.value).lower().strip() if cell.value else "" for cell in fila]
+        if "dominio" in valores:
+            encabezado_fila = fila[0].row
+            break
+
+    if encabezado_fila is None:
+        st.error("No se encontró una fila con encabezados válidos (como 'Dominio').")
+        st.stop()
+
+    encabezados = [str(cell.value).strip() if cell.value else "" for cell in ws[encabezado_fila - 1]]
+    encabezados_normalizados = [e.lower().strip() for e in encabezados]
+    col_map = {col: idx for idx, col in enumerate(encabezados_normalizados)}
 
     errores = []
     corregidos = []
@@ -58,17 +71,17 @@ if file:
     fill_red = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
     font_white = Font(color="FFFFFF", bold=True)
 
-    for row in ws.iter_rows(min_row=9, max_row=ws.max_row, max_col=len(encabezados)):
+    for row in ws.iter_rows(min_row=encabezado_fila + 1, max_row=ws.max_row, max_col=len(encabezados)):
         for cell in row:
-            col_name = encabezados[cell.column - 1]
+            col_name = encabezados_normalizados[cell.column - 1]
             val = cell.value
             original_val = val
 
-            if col_name == "Dominio" and isinstance(val, str):
+            if col_name == "dominio" and isinstance(val, str):
                 nuevo = limpiar_dominio(val)
                 if nuevo != val:
-                    corregidos.append((cell.row, col_name, val, nuevo))
-                    cambios_por_columna[col_name] = cambios_por_columna.get(col_name, 0) + 1
+                    corregidos.append((cell.row, encabezados[cell.column - 1], val, nuevo))
+                    cambios_por_columna[encabezados[cell.column - 1]] = cambios_por_columna.get(encabezados[cell.column - 1], 0) + 1
                     cell.value = nuevo
 
             elif col_name in valores_validos:
@@ -76,10 +89,10 @@ if file:
                 if not ok:
                     cell.fill = fill_red
                     cell.font = font_white
-                    errores.append((cell.row, col_name, val, motivo))
+                    errores.append((cell.row, encabezados[cell.column - 1], val, motivo))
                 elif nuevo != val:
-                    corregidos.append((cell.row, col_name, val, nuevo))
-                    cambios_por_columna[col_name] = cambios_por_columna.get(col_name, 0) + 1
+                    corregidos.append((cell.row, encabezados[cell.column - 1], val, nuevo))
+                    cambios_por_columna[encabezados[cell.column - 1]] = cambios_por_columna.get(encabezados[cell.column - 1], 0) + 1
                     cell.value = nuevo
 
             elif col_name in columnas_fecha:
@@ -87,21 +100,21 @@ if file:
                 if not ok:
                     cell.fill = fill_red
                     cell.font = font_white
-                    errores.append((cell.row, col_name, val, motivo))
+                    errores.append((cell.row, encabezados[cell.column - 1], val, motivo))
                 elif nuevo != val:
-                    corregidos.append((cell.row, col_name, val, nuevo))
-                    cambios_por_columna[col_name] = cambios_por_columna.get(col_name, 0) + 1
+                    corregidos.append((cell.row, encabezados[cell.column - 1], val, nuevo))
+                    cambios_por_columna[encabezados[cell.column - 1]] = cambios_por_columna.get(encabezados[cell.column - 1], 0) + 1
                     cell.value = nuevo
 
-            elif col_name == "Odómetro":
+            elif col_name == "odómetro":
                 nuevo, ok, motivo = validar_entero(val)
                 if not ok:
                     cell.fill = fill_red
                     cell.font = font_white
-                    errores.append((cell.row, col_name, val, motivo))
+                    errores.append((cell.row, encabezados[cell.column - 1], val, motivo))
                 elif nuevo != val:
-                    corregidos.append((cell.row, col_name, val, nuevo))
-                    cambios_por_columna[col_name] = cambios_por_columna.get(col_name, 0) + 1
+                    corregidos.append((cell.row, encabezados[cell.column - 1], val, nuevo))
+                    cambios_por_columna[encabezados[cell.column - 1]] = cambios_por_columna.get(encabezados[cell.column - 1], 0) + 1
                     cell.value = nuevo
 
     st.markdown(f"### 📊 Resumen general")
