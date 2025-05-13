@@ -138,6 +138,7 @@ if file:
                     cell.value = nuevo
 
             else:
+                match_found = False
                 for clave_validada in valores_validos:
                     if normalizar(col_name) == normalizar(clave_validada):
                         nuevo, ok, motivo = validar_aproximado(val, valores_validos[clave_validada])
@@ -149,7 +150,31 @@ if file:
                             corregidos.append((cell.row, encabezados[cell.column - 1], val, nuevo))
                             cambios_por_columna[encabezados[cell.column - 1]] = cambios_por_columna.get(encabezados[cell.column - 1], 0) + 1
                             cell.value = nuevo
+                        match_found = True
                         break
+
+                if not match_found:
+                    if any(normalizar(col_name) == normalizar(f) for f in columnas_fecha):
+                        nuevo, ok, motivo = validar_fecha(val)
+                        if not ok:
+                            cell.fill = fill_red
+                            cell.font = font_white
+                            errores.append((cell.row, encabezados[cell.column - 1], val, motivo))
+                        elif nuevo != val:
+                            corregidos.append((cell.row, encabezados[cell.column - 1], val, nuevo))
+                            cambios_por_columna[encabezados[cell.column - 1]] = cambios_por_columna.get(encabezados[cell.column - 1], 0) + 1
+                            cell.value = nuevo
+
+                    elif normalizar(col_name) in ["odometro", "odometros"]:
+                        nuevo, ok, motivo = validar_entero(val)
+                        if not ok:
+                            cell.fill = fill_red
+                            cell.font = font_white
+                            errores.append((cell.row, encabezados[cell.column - 1], val, motivo))
+                        elif nuevo != val:
+                            corregidos.append((cell.row, encabezados[cell.column - 1], val, nuevo))
+                            cambios_por_columna[encabezados[cell.column - 1]] = cambios_por_columna.get(encabezados[cell.column - 1], 0) + 1
+                            cell.value = nuevo
 
             elif any(normalizar(col_name) == normalizar(f) for f in columnas_fecha):
                 nuevo, ok, motivo = validar_fecha(val)
