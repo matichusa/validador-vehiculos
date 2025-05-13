@@ -145,11 +145,14 @@ if file:
     wb = load_workbook(filename=output)
     ws = wb.active
 
-    # Marcar errores en hoja principal
-    for (idx, row), (colname, coldata) in zip(enumerate(df.iterrows(), start=2), df.items()):
-        for col_index, val in enumerate(row[1], start=1):
+    # Marcar errores en hoja principal (corregido)
+    for row_idx in range(df.shape[0]):
+        for col_idx in range(df.shape[1]):
+            val = df.iat[row_idx, col_idx]
             if val == "NO CORREGIDO":
-                cell = ws.cell(row=idx, column=col_index)
+                excel_row = row_idx + 2  # +2 por encabezado y 0-index
+                excel_col = col_idx + 1
+                cell = ws.cell(row=excel_row, column=excel_col)
                 cell.fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
                 cell.font = Font(color="FFFFFF", bold=True)
 
