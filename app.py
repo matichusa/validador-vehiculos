@@ -52,6 +52,9 @@ def validar_decimal(valor):
         return valor, False, "Número decimal inválido"
 
 def validar_fecha(valor):
+    return validar_fecha_avanzada(valor)
+
+def validar_fecha_avanzada(valor):
     try:
         fecha = pd.to_datetime(valor, dayfirst=True, errors='raise')
         return fecha.strftime("%d/%m/%Y"), True, ""
