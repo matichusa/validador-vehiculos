@@ -91,6 +91,15 @@ valores_validos = {
 }
 columnas_fecha = [c.lower() for c in ["Vto Póliza", "Vto Cédula", "Vto VTV", "Vto Ruta", "Vto GNC", "Vto Cilindro GNC", "Vto Senasa"]]
 
+valores_validos_extra = {
+    "color": ["Rojo", "Azul", "Verde", "Negro", "Blanco", "Gris", "Amarillo", "Bordo", "Plateado", "Beige", "Celeste"],
+    "uso": ["Privado", "Comercial", "Oficial", "Emergencia", "Alquiler"],
+    "tipo de vehiculo": ["Auto", "Camioneta", "Camión", "Moto", "SUV", "Utilitario"],
+    "marca": ["Toyota", "Volkswagen", "Renault", "Ford", "Chevrolet", "Fiat", "Peugeot", "Nissan", "Honda", "Citroën"],
+    "modelo": ["Hilux", "Amarok", "Kangoo", "Ranger", "Onix", "Cronos", "208", "Frontier", "Civic", "C3"],
+    "categoria": ["Sedán", "Pick-Up", "SUV", "Utilitario", "Hatchback", "Familiar"]
+}]
+
 # ---------------- App Streamlit ----------------
 st.title("Validador de Archivo Excel - Estética Original")
 file = st.file_uploader("Subí el archivo Excel original", type=[".xlsx"])
@@ -116,6 +125,7 @@ if file:
     col_map = {col: idx for idx, col in enumerate(encabezados_normalizados)}
 
     errores = []
+valores_unicos = {"dominio": set(), "código - interno": set()}
     corregidos = []
     cambios_por_columna = {}
     fill_red = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
@@ -130,12 +140,27 @@ if file:
             val = cell.value
             original_val = val
 
+            if encabezados_normalizados[col_idx] in ["codigo - interno", "código - interno"]:
+                val_norm = str(val).strip().upper()
+                if val_norm in valores_unicos["código - interno"]:
+                    cell.fill = fill_red
+                    cell.font = font_white
+                    errores.append((cell.row, encabezados[cell.column - 1], val, "Duplicado"))
+                    continue
+                valores_unicos["código - interno"].add(val_norm)
+
             if col_name == "dominio" and isinstance(val, str):
                 nuevo = limpiar_dominio(val)
-                if nuevo != val:
-                    corregidos.append((cell.row, encabezados[cell.column - 1], val, nuevo))
-                    cambios_por_columna[encabezados[cell.column - 1]] = cambios_por_columna.get(encabezados[cell.column - 1], 0) + 1
-                    cell.value = nuevo
+                if nuevo in valores_unicos["dominio"]:
+                    cell.fill = fill_red
+                    cell.font = font_white
+                    errores.append((cell.row, encabezados[cell.column - 1], val, "Duplicado"))
+                else:
+                    valores_unicos["dominio"].add(nuevo)
+                    if nuevo != val:
+                        corregidos.append((cell.row, encabezados[cell.column - 1], val, nuevo))
+                        cambios_por_columna[encabezados[cell.column - 1]] = cambios_por_columna.get(encabezados[cell.column - 1], 0) + 1
+                        cell.value = nuevo
 
             else:
                 match_found = False
@@ -165,7 +190,27 @@ if file:
                             cambios_por_columna[encabezados[cell.column - 1]] = cambios_por_columna.get(encabezados[cell.column - 1], 0) + 1
                             cell.value = nuevo
 
-            elif normalizar(col_name) in ["odometro", "odometros"]:
+                    elif normalizar(col_name) in ["odometro", "odometros"]:
+                        nuevo, ok, motivo = validar_entero(val)
+                        if not ok:
+                            cell.fill = fill_red
+                            cell.font = font_white
+                            errores.append((cell.row, encabezados[cell.column - 1], val, motivo))
+                        elif nuevo != val:
+                            corregidos.append((cell.row, encabezados[cell.column - 1], val, nuevo))
+                            cambios_por_columna[encabezados[cell.column - 1]] = cambios_por_columna.get(encabezados[cell.column - 1], 0) + 1
+                            cell.value = nuevo
+
+                    elif normalizar(col_name) in valores_validos_extra:
+                        nuevo, ok, motivo = validar_aproximado(val, valores_validos_extra[normalizar(col_name)])
+                        if not ok:
+                            cell.fill = fill_red
+                            cell.font = font_white
+                            errores.append((cell.row, encabezados[cell.column - 1], val, motivo))
+                        elif nuevo != val:
+                            corregidos.append((cell.row, encabezados[cell.column - 1], val, nuevo))
+                            cambios_por_columna[encabezados[cell.column - 1]] = cambios_por_columna.get(encabezados[cell.column - 1], 0) + 1
+                            cell.value = nuevo
                 nuevo, ok, motivo = validar_entero(val)
                 if not ok:
                     cell.fill = fill_red
