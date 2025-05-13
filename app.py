@@ -72,12 +72,8 @@ def validar_fecha(valor):
                         valor = sugerencia
         fecha = pd.to_datetime(valor, dayfirst=True, errors='raise')
         return fecha.strftime("%d/%m/%Y"), True, ""
-    except Exception:
-        if sugerencia:
-            return valor, False, f"Fecha inválida. ¿Quisiste decir: {sugerencia}?"
-        return valor, False, "Fecha inválida"
-    except Exception as e:
-        return valor, False, f"Fecha inválida: {e}"
+    
+    
     except Exception as e:
         return valor, False, f"Fecha inválida: {e}"
 
@@ -124,9 +120,9 @@ if file:
     encabezados_normalizados = [e.lower().strip() for e in encabezados]
     col_map = {col: idx for idx, col in enumerate(encabezados_normalizados)}
 
-    errores = []
-valores_unicos = {"dominio": set(), "código - interno": set()}
-    corregidos = []
+                    errores = []
+        valores_unicos = {"dominio": set(), "código - interno": set()}
+                    corregidos = []
     cambios_por_columna = {}
     fill_red = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
     font_white = Font(color="FFFFFF", bold=True)
@@ -191,15 +187,7 @@ valores_unicos = {"dominio": set(), "código - interno": set()}
                             cell.value = nuevo
 
                     elif normalizar(col_name) in ["odometro", "odometros"]:
-                        nuevo, ok, motivo = validar_entero(val)
-                        if not ok:
-                            cell.fill = fill_red
-                            cell.font = font_white
-                            errores.append((cell.row, encabezados[cell.column - 1], val, motivo))
-                        elif nuevo != val:
-                            corregidos.append((cell.row, encabezados[cell.column - 1], val, nuevo))
-                            cambios_por_columna[encabezados[cell.column - 1]] = cambios_por_columna.get(encabezados[cell.column - 1], 0) + 1
-                            cell.value = nuevo
+                        
 
                     elif normalizar(col_name) in valores_validos_extra:
                         nuevo, ok, motivo = validar_aproximado(val, valores_validos_extra[normalizar(col_name)])
