@@ -13,11 +13,18 @@ def limpiar_dominio(valor):
         return valor
     return valor.replace(" ", "").replace("-", "").replace("/", "").upper()
 
-def validar_aproximado(valor, opciones):
+def normalizar(valor):
     if valor is None:
-        return valor, True, ""
-    match = get_close_matches(str(valor).strip().title(), opciones, n=1, cutoff=0.75)
-    return (match[0], True, "") if match else (valor, False, "Valor no válido")
+        return ""
+    return str(valor).strip().lower().replace("á", "a").replace("é", "e").replace("í", "i").replace("ó", "o").replace("ú", "u")
+
+def validar_aproximado(valor, opciones):
+    val_norm = normalizar(valor)
+    opciones_norm = [normalizar(o) for o in opciones]
+    if val_norm in opciones_norm:
+        idx = opciones_norm.index(val_norm)
+        return opciones[idx], True, ""
+    return valor, False, "Valor no válido"
 
 def validar_entero(valor):
     try:
@@ -27,9 +34,40 @@ def validar_entero(valor):
 
 def validar_fecha(valor):
     try:
-        return pd.to_datetime(valor).strftime("%d/%m/%Y"), True, ""
-    except:
+        sugerencia = None
+        if isinstance(valor, str):
+            valor = valor.strip().lower().replace(" del ", " ").replace(" de ", " ")
+            meses = {
+                "enero": "01", "febrero": "02", "marzo": "03", "abril": "04",
+                "mayo": "05", "junio": "06", "julio": "07", "agosto": "08",
+                "septiembre": "09", "octubre": "10", "noviembre": "11", "diciembre": "12"
+            }
+            for mes, num in meses.items():
+                if mes in valor:
+                    partes = valor.replace(mes, num).replace(" ", "/").split("/")
+                    if len(partes) == 2:
+                        partes.insert(0, "01")
+                        sugerencia = "/".join(partes)
+                        valor = sugerencia
+                        break
+            else:
+                if "/" in valor or "-" in valor:
+                    partes = valor.replace("-", "/").split("/")
+                    if len(partes) == 2:
+                        partes.insert(0, "01")
+                        sugerencia = "/".join(partes)
+                        valor = sugerencia
+
+        fecha = pd.to_datetime(valor, dayfirst=True, errors='raise')
+        return fecha.strftime("%d/%m/%Y"), True, ""
+    except Exception:
+        if sugerencia:
+            return valor, False, f"Fecha inválida. ¿Quisiste decir: {sugerencia}?"
         return valor, False, "Fecha inválida"
+    except Exception as e:
+        return valor, False, f"Fecha inválida: {e}"
+    except Exception as e:
+        return valor, False, f"Fecha inválida: {e}"
 
 # ---------------- Configuración ----------------
 valores_validos = {
