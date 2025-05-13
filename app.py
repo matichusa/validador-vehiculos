@@ -1,29 +1,42 @@
-# Validador y corrector de Excel para carga de vehículos con estética preservada
+# Validador Excel Vehículos - Restaurado
 import streamlit as st
 import pandas as pd
-from io import BytesIO
-from difflib import get_close_matches
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill, Font
-from openpyxl.worksheet.worksheet import Worksheet
+from io import BytesIO
+from difflib import get_close_matches
+import unicodedata
 
-# ---------------- Funciones de validación ----------------
+# Normalización
+def normalizar_columna(nombre):
+    if not isinstance(nombre, str):
+        return ""
+    nombre = unicodedata.normalize("NFKD", nombre).encode("ascii", "ignore").decode("utf-8")
+    return nombre.strip().lower()
+
+def titulo_propio(valor):
+    if not isinstance(valor, str):
+        return valor
+    return " ".join(p.capitalize() for p in valor.strip().split())
+
+def mayusculas(valor):
+    if not isinstance(valor, str):
+        return valor
+    return valor.strip().upper()
+
 def limpiar_dominio(valor):
     if not isinstance(valor, str):
         return valor
-    return valor.replace(" ", "").replace("-", "").replace("/", "").upper()
-
-def normalizar(valor):
-    if valor is None:
-        return ""
-    return str(valor).strip().lower().replace("á", "a").replace("é", "e").replace("í", "i").replace("ó", "o").replace("ú", "u")
+    return ''.join(c for c in valor.upper() if c.isalnum())
 
 def validar_aproximado(valor, opciones):
-    val_norm = normalizar(valor)
-    opciones_norm = [normalizar(o) for o in opciones]
+    val_norm = normalizar_columna(valor)
+    opciones_norm = [normalizar_columna(o) for o in opciones]
     if val_norm in opciones_norm:
-        idx = opciones_norm.index(val_norm)
-        return opciones[idx], True, ""
+        return opciones[opciones_norm.index(val_norm)], True, ""
+    match = get_close_matches(val_norm, opciones_norm, n=1, cutoff=0.7)
+    if match:
+        return opciones[opciones_norm.index(match[0])], True, ""
     return valor, False, "Valor no válido"
 
 def validar_entero(valor):
@@ -32,238 +45,116 @@ def validar_entero(valor):
     except:
         return valor, False, "Número entero inválido"
 
+def validar_decimal(valor):
+    try:
+        return round(float(valor), 1), True, ""
+    except:
+        return valor, False, "Número decimal inválido"
+
 def validar_fecha(valor):
     try:
-        sugerencia = None
-        if isinstance(valor, str):
-            valor = valor.strip().lower().replace(" del ", " ").replace(" de ", " ")
-            meses = {
-                "enero": "01", "ene": "01", "january": "01", "jan": "01",
-                "febrero": "02", "feb": "02", "february": "02",
-                "marzo": "03", "mar": "03", "march": "03",
-                "abril": "04", "apr": "04", "april": "04",
-                "mayo": "05", "may": "05",
-                "junio": "06", "jun": "06", "june": "06",
-                "julio": "07", "jul": "07", "july": "07",
-                "agosto": "08", "aug": "08", "august": "08",
-                "septiembre": "09", "sep": "09", "sept": "09", "september": "09",
-                "octubre": "10", "oct": "10", "october": "10",
-                "noviembre": "11", "nov": "11", "november": "11",
-                "diciembre": "12", "dic": "12", "dec": "12", "december": "12"
-            }
-            for mes, num in meses.items():
-                if mes in valor:
-                    limpio = valor.replace(mes, num).replace(" ", "/").replace("-", "/").replace(".", "/")
-                    partes = limpio.split("/")
-                    if len(partes) == 2:
-                        partes.insert(0, "01")
-                        sugerencia = "/".join(partes)
-                        valor = sugerencia
-                        break
-                    elif len(partes) == 3:
-                        valor = "/".join(partes)
-                        break
-            else:
-                if "/" in valor or "-" in valor:
-                    partes = valor.replace("-", "/").split("/")
-                    if len(partes) == 2:
-                        partes.insert(0, "01")
-                        sugerencia = "/".join(partes)
-                        valor = sugerencia
         fecha = pd.to_datetime(valor, dayfirst=True, errors='raise')
         return fecha.strftime("%d/%m/%Y"), True, ""
-    
-    
     except Exception as e:
         return valor, False, f"Fecha inválida: {e}"
 
-# ---------------- Configuración ----------------
+# Configuración
 valores_validos = {
-    "combustible": ["Nafta", "Diésel", "Gas", "Eléctrico"],
+    "combustible": ["Nafta", "Diesel", "Gas", "Electrico"],
     "med. uso": ["Kilometros", "Millas", "Horas"],
     "estado": ["Asignado", "Disponible", "En Taller", "Fuera de Servicio"],
-    "tipo de cobertura": ["Terceros Completo Estandard", "Tercero Completo Premium", "Todo Riesgo"],
+    "tipo cobertura": ["Tercero Completo Estandard", "Tercero Completo Premium", "Todo Riesgo"],
     "titularidad": ["Propio", "Alquilado", "Leasing", "Prendario"]
 }
-columnas_fecha = [c.lower() for c in ["Vto Póliza", "Vto Cédula", "Vto VTV", "Vto Ruta", "Vto GNC", "Vto Cilindro GNC", "Vto Senasa"]]
+columnas_fecha = [
+    "vto póliza", "vto cédula", "vto vtv", "vto ruta",
+    "vto gnc", "vto cilindro gnc", "vto senasa"
+]
 
-valores_validos_extra = {
-    "color": ["Rojo", "Azul", "Verde", "Negro", "Blanco", "Gris", "Amarillo", "Bordo", "Plateado", "Beige", "Celeste"],
-    "uso": ["Privado", "Comercial", "Oficial", "Emergencia", "Alquiler"],
-    "tipo de vehiculo": ["Auto", "Camioneta", "Camión", "Moto", "SUV", "Utilitario"],
-    "marca": ["Toyota", "Volkswagen", "Renault", "Ford", "Chevrolet", "Fiat", "Peugeot", "Nissan", "Honda", "Citroën"],
-    "modelo": ["Hilux", "Amarok", "Kangoo", "Ranger", "Onix", "Cronos", "208", "Frontier", "Civic", "C3"],
-    "categoria": ["Sedán", "Pick-Up", "SUV", "Utilitario", "Hatchback", "Familiar"]
-}
+st.title("Validador Excel Vehículos")
 
-# ---------------- App Streamlit ----------------
-st.title("Validador de Archivo Excel - Estética Original")
-file = st.file_uploader("Subí el archivo Excel original", type=[".xlsx"])
+file = st.file_uploader("Subí el archivo Excel", type=["xlsx"])
 
 if file:
     wb = load_workbook(file)
-    ws = wb[wb.sheetnames[0]]
+    ws = wb.active
 
-    # Buscar encabezado dinámicamente
-    encabezado_fila = None
-    for fila in ws.iter_rows(min_row=1, max_row=15):
-        valores = [str(cell.value).lower().strip() if cell.value else "" for cell in fila]
-        if "dominio" in valores:
-            encabezado_fila = fila[0].row
-            break
+    encabezado = [str(c.value).strip() if c.value else "" for c in ws[6]]
+    encabezado_normalizado = [normalizar_columna(c) for c in encabezado]
 
-    if encabezado_fila is None:
-        st.error("No se encontró una fila con encabezados válidos (como 'Dominio').")
-        st.stop()
-
-    encabezados = [str(cell.value).strip() if cell.value else "" for cell in ws[encabezado_fila - 1]]
-    encabezados_normalizados = [e.lower().strip() for e in encabezados]
     errores = []
-    valores_unicos = {"dominio": set(), "código - interno": set()}
     corregidos = []
     cambios_por_columna = {}
-    fill_red = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
-    font_white = Font(color="FFFFFF", bold=True)
 
-    for row in ws.iter_rows(min_row=encabezado_fila + 1, max_row=ws.max_row, max_col=len(encabezados)):
+    rojo = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
+    blanco = Font(color="FFFFFF", bold=True)
+
+    for row in ws.iter_rows(min_row=7, max_row=ws.max_row, max_col=len(encabezado)):
         for cell in row:
             col_idx = cell.column - 1
-            if col_idx >= len(encabezados_normalizados):
+            if col_idx >= len(encabezado):
                 continue
-            col_name = encabezados_normalizados[col_idx]
-            val = cell.value
-            original_val = val
 
-            if encabezados_normalizados[col_idx] in ["codigo - interno", "código - interno"]:
-                val_norm = str(val).strip().upper()
-                if val_norm in valores_unicos["código - interno"]:
-                    cell.fill = fill_red
-                    cell.font = font_white
-                    errores.append((cell.row, encabezados[cell.column - 1], val, "Duplicado"))
-                    continue
-                valores_unicos["código - interno"].add(val_norm)
+            col = encabezado_normalizado[col_idx]
+            col_original = encabezado[col_idx]
+            original = cell.value
 
-            if col_name == "dominio" and isinstance(val, str):
-                nuevo = limpiar_dominio(val)
-                if nuevo in valores_unicos["dominio"]:
-                    cell.fill = fill_red
-                    cell.font = font_white
-                    errores.append((cell.row, encabezados[cell.column - 1], val, "Duplicado"))
+            if original is None or str(original).strip() == "":
+                continue
+
+            nuevo = original
+            ok = True
+            motivo = ""
+
+            if col == "codigo - interno":
+                nuevo = mayusculas(original)
+            elif col == "dominio":
+                nuevo = limpiar_dominio(original)
+            elif col in ["marca", "modelo", "tipo de vehiculo", "grupo - base", "cia. seguros", "nombre del titular"]:
+                nuevo = titulo_propio(original)
+            elif col in ["nro chasis", "nro motor", "nro póliza"]:
+                nuevo = mayusculas(original)
+            elif col == "año":
+                if isinstance(original, str) and "/" in original:
+                    try:
+                        nuevo = pd.to_datetime(original, dayfirst=True).year
+                    except:
+                        pass
                 else:
-                    valores_unicos["dominio"].add(nuevo)
-                    if nuevo != val:
-                        corregidos.append((cell.row, encabezados[cell.column - 1], val, nuevo))
-                        cambios_por_columna[encabezados[cell.column - 1]] = cambios_por_columna.get(encabezados[cell.column - 1], 0) + 1
-                        cell.value = nuevo
+                    nuevo, ok, motivo = validar_entero(original)
+            elif col == "color":
+                nuevo = titulo_propio(original)
+            elif col == "cons. promedio":
+                nuevo, ok, motivo = validar_decimal(original)
+            elif col in valores_validos:
+                nuevo, ok, motivo = validar_aproximado(original, valores_validos[col])
+            elif col in columnas_fecha:
+                nuevo, ok, motivo = validar_fecha(original)
+            elif col == "comentarios":
+                nuevo = titulo_propio(original.lower())
 
-            else:
-                match_found = False
-                for clave_validada in valores_validos:
-                    if normalizar(col_name) == normalizar(clave_validada):
-                        nuevo, ok, motivo = validar_aproximado(val, valores_validos[clave_validada])
-                        if not ok:
-                            cell.fill = fill_red
-                            cell.font = font_white
-                            errores.append((cell.row, encabezados[cell.column - 1], val, motivo))
-                        elif nuevo != val:
-                            corregidos.append((cell.row, encabezados[cell.column - 1], val, nuevo))
-                            cambios_por_columna[encabezados[cell.column - 1]] = cambios_por_columna.get(encabezados[cell.column - 1], 0) + 1
-                            cell.value = nuevo
-                        match_found = True
-                        break
+            if not ok:
+                cell.fill = rojo
+                cell.font = blanco
+                errores.append((cell.row, col_original, original, motivo))
+            elif nuevo != original:
+                cell.value = nuevo
+                corregidos.append((cell.row, col_original, original, nuevo))
+                cambios_por_columna[col_original] = cambios_por_columna.get(col_original, 0) + 1
 
-                if not match_found:
-                    if any(normalizar(col_name) == normalizar(f) for f in columnas_fecha):
-                        nuevo, ok, motivo = validar_fecha(val)
-                        if not ok:
-                            cell.fill = fill_red
-                            cell.font = font_white
-                            errores.append((cell.row, encabezados[cell.column - 1], val, motivo))
-                        elif nuevo != val:
-                            corregidos.append((cell.row, encabezados[cell.column - 1], val, nuevo))
-                            cambios_por_columna[encabezados[cell.column - 1]] = cambios_por_columna.get(encabezados[cell.column - 1], 0) + 1
-                            cell.value = nuevo
-
-                    elif normalizar(col_name) in ["odometro", "odometros"]:
-                        nuevo, ok, motivo = validar_entero(val)
-                        if not ok:
-                            cell.fill = fill_red
-                            cell.font = font_white
-                            errores.append((cell.row, encabezados[cell.column - 1], val, motivo))
-                        elif nuevo != val:
-                            corregidos.append((cell.row, encabezados[cell.column - 1], val, nuevo))
-                            cambios_por_columna[encabezados[cell.column - 1]] = cambios_por_columna.get(encabezados[cell.column - 1], 0) + 1
-                            cell.value = nuevo
-                    elif normalizar(col_name) in valores_validos_extra:
-                        nuevo, ok, motivo = validar_aproximado(val, valores_validos_extra[normalizar(col_name)])
-                        if not ok:
-                            cell.fill = fill_red
-                            cell.font = font_white
-                            errores.append((cell.row, encabezados[cell.column - 1], val, motivo))
-                        elif nuevo != val:
-                            corregidos.append((cell.row, encabezados[cell.column - 1], val, nuevo))
-                            cambios_por_columna[encabezados[cell.column - 1]] = cambios_por_columna.get(encabezados[cell.column - 1], 0) + 1
-                            cell.value = nuevo
-                nuevo, ok, motivo = validar_entero(val)
-                if not ok:
-                    cell.fill = fill_red
-                    cell.font = font_white
-                    errores.append((cell.row, encabezados[cell.column - 1], val, motivo))
-                elif nuevo != val:
-                    corregidos.append((cell.row, encabezados[cell.column - 1], val, nuevo))
-                    cambios_por_columna[encabezados[cell.column - 1]] = cambios_por_columna.get(encabezados[cell.column - 1], 0) + 1
-                    cell.value = nuevo
-
-    st.markdown(f"### 📊 Resumen general")
+    st.markdown("### 📊 Resumen general")
     st.info(f"Se detectaron **{len(errores)} errores** y se corrigieron automáticamente **{len(corregidos)} valores**.")
 
     with st.expander("📋 Ver resumen de cambios detectados"):
         if errores:
             st.markdown("### ⚠️ Cambios no corregidos")
             st.dataframe(pd.DataFrame(errores, columns=["Fila", "Columna", "Valor original", "Observación"]))
-        else:
-            st.info("No se detectaron errores no corregibles.")
-
-        st.markdown("### ✅ Cambios realizados")
         if corregidos:
-            st.markdown(f"🔢 Total de celdas corregidas: **{len(corregidos)}**")
-            st.markdown("📊 Cambios por columna:")
-            st.dataframe(pd.DataFrame.from_dict(cambios_por_columna, orient="index", columns=["Cantidad de cambios"]))
-            st.markdown("📝 Detalle de cambios:")
-        st.dataframe(pd.DataFrame(
-            corregidos,
-            columns=["Fila", "Columna", "Valor original", "Valor corregido"]
-        ))
-
-    if errores or corregidos:
-        st.markdown("### 👁️ Vista previa de celdas modificadas")
-        vista_previa = errores + corregidos
-        vista_df = pd.DataFrame(vista_previa, columns=["Fila", "Columna", "Valor original", "Valor corregido"])
-        st.dataframe(vista_df)
-    else:
-        st.info("No se realizaron correcciones automáticas.")
-
-    if errores:
-        log_ws = wb.create_sheet("Log de Errores")
-        log_ws.append(["Fila", "Columna", "Valor original", "Observación"])
-        for fila, columna, valor, observacion in errores:
-            log_ws.append([fila, columna, valor, observacion])
-
-    if corregidos:
-        resumen_ws = wb.create_sheet("Resumen de Cambios")
-        resumen_ws.append(["Fila", "Columna", "Valor original", "Valor corregido"])
-        for fila, columna, original, nuevo in corregidos:
-            resumen_ws.append([fila, columna, original, nuevo])
+            st.markdown("### ✅ Cambios realizados")
+            st.dataframe(pd.DataFrame(corregidos, columns=["Fila", "Columna", "Valor original", "Valor corregido"]))
 
     output = BytesIO()
     wb.save(output)
     output.seek(0)
 
-    st.download_button(
-        label="📥 Descargar archivo validado",
-        data=output,
-        file_name="vehiculos_validado.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
-
-    st.success("Archivo validado conservando su estética. Se agregaron hojas con log de errores y resumen de cambios si se detectaron.")
+    st.download_button("📥 Descargar archivo validado", data=output, file_name="vehiculos_validado.xlsx")
