@@ -52,6 +52,44 @@ def validar_decimal(valor):
         return valor, False, "Número decimal inválido"
 
 def validar_fecha(valor):
+    return validar_fecha_robusta(valor)
+
+def validar_fecha_robusta(valor):
+    try:
+        if pd.isna(valor):
+            return valor, True, ""
+        
+        if isinstance(valor, (pd.Timestamp, datetime)):
+            return valor.strftime("%d/%m/%Y"), True, ""
+
+        if isinstance(valor, str):
+            val = valor.lower().strip()
+            val = val.replace(",", "").replace("del ", "").replace(" de ", " ")
+            meses = {
+                "enero": "01", "febrero": "02", "marzo": "03", "abril": "04",
+                "mayo": "05", "junio": "06", "julio": "07", "agosto": "08",
+                "septiembre": "09", "setiembre": "09", "octubre": "10",
+                "noviembre": "11", "diciembre": "12"
+            }
+            for mes_texto, mes_num in meses.items():
+                if mes_texto in val:
+                    val = val.replace(mes_texto, mes_num)
+                    break
+
+            val = val.replace("-", "/").replace(".", "/")
+            partes = val.split()
+
+            if len(partes) == 3 and all(any(c.isdigit() for c in p) for p in partes):
+                val = "/".join(partes)
+
+            fecha = pd.to_datetime(val, dayfirst=True, errors='raise')
+            return fecha.strftime("%d/%m/%Y"), True, ""
+        
+        fecha = pd.to_datetime(valor, dayfirst=True, errors='raise')
+        return fecha.strftime("%d/%m/%Y"), True, ""
+
+    except Exception as e:
+        return valor, False, f"Fecha inválida: {e}"
     return validar_fecha_avanzada(valor)
 
 def validar_fecha_avanzada(valor):
