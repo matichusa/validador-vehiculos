@@ -285,7 +285,7 @@ if file:
                 cell.fill = rojo
                 cell.font = blanco
                 errores.append((cell.row, col_original, original, motivo))
-            elif nuevo != original:
+            elif str(nuevo) != str(original):
                 cell.value = nuevo
                 corregidos.append((cell.row, col_original, original, nuevo))
                 cambios_por_columna[col_original] = cambios_por_columna.get(col_original, 0) + 1
