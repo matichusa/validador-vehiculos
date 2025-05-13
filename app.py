@@ -151,7 +151,7 @@ if file:
                             cell.value = nuevo
                         break
 
-            elif col_name in columnas_fecha:
+            elif any(normalizar(col_name) == normalizar(f) for f in columnas_fecha):
                 nuevo, ok, motivo = validar_fecha(val)
                 if not ok:
                     cell.fill = fill_red
@@ -162,7 +162,7 @@ if file:
                     cambios_por_columna[encabezados[cell.column - 1]] = cambios_por_columna.get(encabezados[cell.column - 1], 0) + 1
                     cell.value = nuevo
 
-            elif col_name == "odómetro":
+            elif normalizar(col_name) in ["odometro", "odometros"]:
                 nuevo, ok, motivo = validar_entero(val)
                 if not ok:
                     cell.fill = fill_red
