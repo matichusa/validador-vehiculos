@@ -1,225 +1,89 @@
-from datetime import datetime
-# Validador Excel Vehículos - Restaurado
+
+# validador_excel_vehiculos.py
 import streamlit as st
 import pandas as pd
-from openpyxl import load_workbook
-from openpyxl.styles import PatternFill, Font
 from io import BytesIO
 from difflib import get_close_matches
-import unicodedata
+from openpyxl import load_workbook
+from openpyxl.styles import PatternFill, Font
+from datetime import datetime
 
-# Normalización
-def normalizar_columna(nombre):
-    if not isinstance(nombre, str):
-        return ""
-    nombre = unicodedata.normalize("NFKD", nombre).encode("ascii", "ignore").decode("utf-8")
-    return nombre.strip().lower()
-
-def titulo_propio(valor):
-    if not isinstance(valor, str):
-        return valor
-    return " ".join(p.capitalize() for p in valor.strip().split())
-
-def mayusculas(valor):
-    if not isinstance(valor, str):
-        return valor
-    return valor.strip().upper()
-
+# ---------------- Funciones de validación ----------------
 def limpiar_dominio(valor):
     if not isinstance(valor, str):
         return valor
-    return ''.join(c for c in valor.upper() if c.isalnum())
+    return ''.join(filter(str.isalnum, valor.upper()))
+
+def normalizar(valor):
+    if valor is None:
+        return ""
+    return str(valor).strip().lower().replace("á", "a").replace("é", "e").replace("í", "i").replace("ó", "o").replace("ú", "u")
 
 def validar_aproximado(valor, opciones):
-    val_norm = normalizar_columna(valor)
-    opciones_norm = [normalizar_columna(o) for o in opciones]
+    val_norm = normalizar(valor)
+    opciones_norm = [normalizar(o) for o in opciones]
     if val_norm in opciones_norm:
-        return opciones[opciones_norm.index(val_norm)], True, ""
-    match = get_close_matches(val_norm, opciones_norm, n=1, cutoff=0.7)
-    if match:
-        return opciones[opciones_norm.index(match[0])], True, ""
+        idx = opciones_norm.index(val_norm)
+        return opciones[idx], True, ""
+    coincidencias = get_close_matches(val_norm, opciones_norm, n=1, cutoff=0.8)
+    if coincidencias:
+        idx = opciones_norm.index(coincidencias[0])
+        return opciones[idx], True, ""
     return valor, False, "Valor no válido"
 
 def validar_entero(valor):
+    if pd.isna(valor) or valor == "":
+        return valor, True, ""
     try:
         return int(float(valor)), True, ""
     except:
         return valor, False, "Número entero inválido"
 
 def validar_decimal(valor):
+    if pd.isna(valor) or valor == "":
+        return valor, True, ""
     try:
-        return round(float(valor), 1), True, ""
+        val = round(float(valor), 1)
+        return val, True, ""
     except:
         return valor, False, "Número decimal inválido"
 
 def validar_fecha(valor):
+    if pd.isna(valor) or valor == "":
+        return "", True, ""
     try:
-        if pd.isna(valor) or str(valor).strip() == "":
-            return "", True, ""
-
-        if isinstance(valor, str):
-            val = valor.strip().lower().replace(",", "").replace("del ", "").replace(" de ", " ")
-            if "00:00:00" in val:
-                try:
-                    fecha = pd.to_datetime(val.split()[0], format="%Y-%m-%d", errors='raise')
-                    return fecha.strftime("%d/%m/%Y"), True, ""
-                except:
-                    pass
+        if isinstance(valor, datetime):
+            return valor.strftime("%d/%m/%Y"), True, ""
+        elif isinstance(valor, str):
+            valor = valor.strip().lower().replace(" del ", " ").replace(" de ", " ")
             meses = {
-                "enero": "01", "febrero": "02", "marzo": "03", "abril": "04",
-                "mayo": "05", "junio": "06", "julio": "07", "agosto": "08",
-                "septiembre": "09", "setiembre": "09", "octubre": "10",
-                "noviembre": "11", "diciembre": "12"
+                "enero": "01", "ene": "01", "january": "01", "jan": "01",
+                "febrero": "02", "feb": "02", "february": "02",
+                "marzo": "03", "mar": "03", "march": "03",
+                "abril": "04", "apr": "04", "april": "04",
+                "mayo": "05", "may": "05",
+                "junio": "06", "jun": "06", "june": "06",
+                "julio": "07", "jul": "07", "july": "07",
+                "agosto": "08", "aug": "08", "august": "08",
+                "septiembre": "09", "sep": "09", "sept": "09", "september": "09",
+                "octubre": "10", "oct": "10", "october": "10",
+                "noviembre": "11", "nov": "11", "november": "11",
+                "diciembre": "12", "dic": "12", "dec": "12", "december": "12"
             }
             for mes, num in meses.items():
-                if mes in val:
-                    val = val.replace(mes, num)
-                    break
-            val = val.replace("-", "/").replace(".", "/")
-            partes = val.split()
-            if len(partes) == 3 and all(any(c.isdigit() for c in p) for p in partes):
-                val = "/".join(partes)
-            fecha = pd.to_datetime(val, dayfirst=True, errors='raise')
+                if mes in valor:
+                    valor = valor.replace(mes, num)
+            valor = valor.replace("-", "/").replace(".", "/")
+            fecha = pd.to_datetime(valor, dayfirst=True, errors='coerce')
+            if pd.isna(fecha):
+                raise ValueError("No se pudo convertir")
             return fecha.strftime("%d/%m/%Y"), True, ""
-
-        if isinstance(valor, (pd.Timestamp, datetime)):
-            return pd.to_datetime(valor).strftime("%d/%m/%Y"), True, ""
-
-        fecha = pd.to_datetime(valor, dayfirst=True, errors='raise')
-        return fecha.strftime("%d/%m/%Y"), True, ""
-
-    except Exception as e:
-        return valor, False, f"Fecha inválida: {e}"
-    try:
-        if pd.isna(valor) or str(valor).strip() == "":
-            return "", True, ""
-
-        if isinstance(valor, (pd.Timestamp, datetime)):
-            return pd.to_datetime(valor).strftime("%d/%m/%Y"), True, ""
-
-        if isinstance(valor, str):
-            val = valor.lower().strip()
-            val = val.replace(",", "").replace("del ", "").replace(" de ", " ")
-            meses = {
-                "enero": "01", "febrero": "02", "marzo": "03", "abril": "04",
-                "mayo": "05", "junio": "06", "julio": "07", "agosto": "08",
-                "septiembre": "09", "setiembre": "09", "octubre": "10",
-                "noviembre": "11", "diciembre": "12"
-            }
-            for mes_texto, mes_num in meses.items():
-                if mes_texto in val:
-                    val = val.replace(mes_texto, mes_num)
-                    break
-
-            val = val.replace("-", "/").replace(".", "/")
-            partes = val.split()
-
-            if len(partes) == 3 and all(any(c.isdigit() for c in p) for p in partes):
-                val = "/".join(partes)
-
-            fecha = pd.to_datetime(val, dayfirst=True, errors='raise')
-            return fecha.strftime("%d/%m/%Y"), True, ""
-
-        fecha = pd.to_datetime(valor, dayfirst=True, errors='raise')
-        return fecha.strftime("%d/%m/%Y"), True, ""
-
-    except Exception as e:
-        return valor, False, f"Fecha inválida: {e}"
-    try:
-        if pd.isna(valor) or str(valor).strip() == "":
-            return "", True, ""
-
-        if isinstance(valor, (pd.Timestamp, datetime)):
-            return pd.to_datetime(valor).strftime("%d/%m/%Y"), True, ""
-
-        if isinstance(valor, str):
-            val = valor.lower().strip()
-            val = val.replace(",", "").replace("del ", "").replace(" de ", " ")
-            meses = {
-                "enero": "01", "febrero": "02", "marzo": "03", "abril": "04",
-                "mayo": "05", "junio": "06", "julio": "07", "agosto": "08",
-                "septiembre": "09", "setiembre": "09", "octubre": "10",
-                "noviembre": "11", "diciembre": "12"
-            }
-            for mes_texto, mes_num in meses.items():
-                if mes_texto in val:
-                    val = val.replace(mes_texto, mes_num)
-                    break
-
-            val = val.replace("-", "/").replace(".", "/")
-            partes = val.split()
-
-            if len(partes) == 3 and all(any(c.isdigit() for c in p) for p in partes):
-                val = "/".join(partes)
-
-            fecha = pd.to_datetime(val, dayfirst=True, errors='raise')
-            return fecha.strftime("%d/%m/%Y"), True, ""
-
-        fecha = pd.to_datetime(valor, dayfirst=True, errors='raise')
-        return fecha.strftime("%d/%m/%Y"), True, ""
-
-    except Exception as e:
-        return valor, False, f"Fecha inválida: {e}"
-    return validar_fecha_robusta(valor)
-
-def validar_fecha_robusta(valor):
-    try:
-        if pd.isna(valor):
-            return valor, True, ""
-        
-        if isinstance(valor, (pd.Timestamp, datetime)):
-            return pd.to_datetime(valor).strftime("%d/%m/%Y"), True, ""
-
-        if isinstance(valor, str):
-            val = valor.lower().strip()
-            val = val.replace(",", "").replace("del ", "").replace(" de ", " ")
-            meses = {
-                "enero": "01", "febrero": "02", "marzo": "03", "abril": "04",
-                "mayo": "05", "junio": "06", "julio": "07", "agosto": "08",
-                "septiembre": "09", "setiembre": "09", "octubre": "10",
-                "noviembre": "11", "diciembre": "12"
-            }
-            for mes_texto, mes_num in meses.items():
-                if mes_texto in val:
-                    val = val.replace(mes_texto, mes_num)
-                    break
-
-            val = val.replace("-", "/").replace(".", "/")
-            partes = val.split()
-
-            if len(partes) == 3 and all(any(c.isdigit() for c in p) for p in partes):
-                val = "/".join(partes)
-
-            fecha = pd.to_datetime(val, dayfirst=True, errors='raise')
-            return fecha.strftime("%d/%m/%Y"), True, ""
-        
-        fecha = pd.to_datetime(valor, dayfirst=True, errors='raise')
-        return fecha.strftime("%d/%m/%Y"), True, ""
-
-    except Exception as e:
-        return valor, False, f"Fecha inválida: {e}"
-    return validar_fecha_avanzada(valor)
-
-def validar_fecha_avanzada(valor):
-    try:
         fecha = pd.to_datetime(valor, dayfirst=True, errors='raise')
         return fecha.strftime("%d/%m/%Y"), True, ""
     except Exception as e:
         return valor, False, f"Fecha inválida: {e}"
 
-# Configuración
-valores_validos = {
-    "combustible": ["Nafta", "Diesel", "Gas", "Electrico"],
-    "med. uso": ["Kilometros", "Millas", "Horas"],
-    "estado": ["Asignado", "Disponible", "En Taller", "Fuera de Servicio"],
-    "tipo cobertura": ["Tercero Completo Estandard", "Tercero Completo Premium", "Todo Riesgo"],
-    "titularidad": ["Propio", "Alquilado", "Leasing", "Prendario"]
-}
-columnas_fecha = [
-    "vto póliza", "vto cédula", "vto vtv", "vto ruta",
-    "vto gnc", "vto cilindro gnc", "vto senasa"
-]
-
+# ---------------- App Streamlit ----------------
 st.title("Validador Excel Vehículos")
 
 file = st.file_uploader("Subí el archivo Excel", type=["xlsx"])
@@ -228,88 +92,69 @@ if file:
     wb = load_workbook(file)
     ws = wb.active
 
-    encabezado = [str(c.value).strip() if c.value else "" for c in ws[6]]
-    encabezado_normalizado = [normalizar_columna(c) for c in encabezado]
+    encabezados = [cell.value for cell in next(ws.iter_rows(min_row=1, max_row=1))]
+    encabezados_norm = [normalizar(e) for e in encabezados]
 
     errores = []
     corregidos = []
     cambios_por_columna = {}
+    valores_unicos = {"dominio": set()}
+    fill_red = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
+    font_white = Font(color="FFFFFF", bold=True)
 
-    rojo = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
-    blanco = Font(color="FFFFFF", bold=True)
+    columnas_fecha = [
+        "vto póliza", "vto cédula", "vto vtv", "vto ruta",
+        "vto gnc", "vto cilindro gnc", "vto senasa"
+    ]
 
-    for row in ws.iter_rows(min_row=7, max_row=ws.max_row, max_col=len(encabezado)):
+    for row in ws.iter_rows(min_row=2):
         for cell in row:
             col_idx = cell.column - 1
-            if col_idx >= len(encabezado):
-                continue
+            col_name = encabezados_norm[col_idx]
+            original_val = cell.value
 
-            col = encabezado_normalizado[col_idx]
-            col_original = encabezado[col_idx]
-            original = cell.value
-
-            if original is None or str(original).strip() == "":
-                continue
-
-            nuevo = original
-            ok = True
-            motivo = ""
-
-            if col == "codigo - interno":
-                nuevo = mayusculas(original)
-            elif col == "dominio":
-                nuevo = limpiar_dominio(original)
+            if col_name == "dominio":
+                nuevo = limpiar_dominio(original_val)
                 if nuevo in valores_unicos["dominio"]:
-                    cell.fill = rojo
-                    cell.font = blanco
-                    errores.append((cell.row, col_original, original, "Dominio duplicado"))
-                    continue
-                valores_unicos["dominio"].add(nuevo)
-            elif col in ["marca", "modelo", "tipo de vehiculo", "grupo - base", "cia. seguros", "nombre del titular"]:
-                nuevo = titulo_propio(original)
-            elif col in ["nro chasis", "nro motor", "nro póliza"]:
-                nuevo = mayusculas(original)
-            elif col == "año":
-                if isinstance(original, str) and "/" in original:
-                    try:
-                        nuevo = pd.to_datetime(original, dayfirst=True).year
-                    except:
-                        pass
+                    cell.fill = fill_red
+                    cell.font = font_white
+                    errores.append((cell.row, encabezados[col_idx], original_val, "Dominio duplicado"))
                 else:
-                    nuevo, ok, motivo = validar_entero(original)
-            elif col == "color":
-                nuevo = titulo_propio(original)
-            elif col == "cons. promedio":
-                nuevo, ok, motivo = validar_decimal(original)
-            elif col in valores_validos:
-                nuevo, ok, motivo = validar_aproximado(original, valores_validos[col])
-            elif col in [normalizar_columna(c) for c in columnas_fecha]:
-                nuevo, ok, motivo = validar_fecha(original)
-            elif col == "comentarios":
-                nuevo = titulo_propio(original.lower())
+                    valores_unicos["dominio"].add(nuevo)
+                    if nuevo != original_val:
+                        corregidos.append((cell.row, encabezados[col_idx], original_val, nuevo))
+                        cambios_por_columna[encabezados[col_idx]] = cambios_por_columna.get(encabezados[col_idx], 0) + 1
+                        cell.value = nuevo
 
-            if not ok:
-                cell.fill = rojo
-                cell.font = blanco
-                errores.append((cell.row, col_original, original, motivo))
-            elif str(nuevo) != str(original):
-                cell.value = nuevo
-                corregidos.append((cell.row, col_original, original, nuevo))
-                cambios_por_columna[col_original] = cambios_por_columna.get(col_original, 0) + 1
+            elif col_name in columnas_fecha:
+                nuevo, ok, msg = validar_fecha(original_val)
+                if not ok:
+                    cell.fill = fill_red
+                    cell.font = font_white
+                    errores.append((cell.row, encabezados[col_idx], original_val, msg))
+                elif nuevo != original_val:
+                    corregidos.append((cell.row, encabezados[col_idx], original_val, nuevo))
+                    cambios_por_columna[encabezados[col_idx]] = cambios_por_columna.get(encabezados[col_idx], 0) + 1
+                    cell.value = nuevo
 
-    st.markdown("### 📊 Resumen general")
+    st.markdown(f"### 📊 Resumen general")
     st.info(f"Se detectaron **{len(errores)} errores** y se corrigieron automáticamente **{len(corregidos)} valores**.")
 
-    with st.expander("📋 Ver resumen de cambios detectados"):
+    with st.expander("📋 Ver detalles de cambios"):
         if errores:
-            st.markdown("### ⚠️ Cambios no corregidos")
+            st.markdown("### ❌ No corregidos")
             st.dataframe(pd.DataFrame(errores, columns=["Fila", "Columna", "Valor original", "Observación"]))
         if corregidos:
-            st.markdown("### ✅ Cambios realizados")
+            st.markdown("### ✅ Corregidos")
             st.dataframe(pd.DataFrame(corregidos, columns=["Fila", "Columna", "Valor original", "Valor corregido"]))
 
     output = BytesIO()
     wb.save(output)
     output.seek(0)
 
-    st.download_button("📥 Descargar archivo validado", data=output, file_name="vehiculos_validado.xlsx")
+    st.download_button(
+        "📥 Descargar Excel Validado",
+        data=output,
+        file_name="vehiculos_validado.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
