@@ -73,7 +73,10 @@ if file:
 
     for row in ws.iter_rows(min_row=encabezado_fila + 1, max_row=ws.max_row, max_col=len(encabezados)):
         for cell in row:
-            col_name = encabezados_normalizados[cell.column - 1]
+            col_idx = cell.column - 1
+            if col_idx >= len(encabezados_normalizados):
+                continue
+            col_name = encabezados_normalizados[col_idx]
             val = cell.value
             original_val = val
 
