@@ -56,12 +56,43 @@ def validar_fecha(valor):
         if pd.isna(valor) or str(valor).strip() == "":
             return "", True, ""
 
-        if isinstance(valor, str) and "00:00:00" in valor:
-            try:
-                fecha = pd.to_datetime(valor.strip().split()[0], format="%Y-%m-%d", errors='raise')
-                return fecha.strftime("%d/%m/%Y"), True, ""
-            except:
-                pass
+        if isinstance(valor, str):
+            val = valor.strip().lower().replace(",", "").replace("del ", "").replace(" de ", " ")
+            if "00:00:00" in val:
+                try:
+                    fecha = pd.to_datetime(val.split()[0], format="%Y-%m-%d", errors='raise')
+                    return fecha.strftime("%d/%m/%Y"), True, ""
+                except:
+                    pass
+            meses = {
+                "enero": "01", "febrero": "02", "marzo": "03", "abril": "04",
+                "mayo": "05", "junio": "06", "julio": "07", "agosto": "08",
+                "septiembre": "09", "setiembre": "09", "octubre": "10",
+                "noviembre": "11", "diciembre": "12"
+            }
+            for mes, num in meses.items():
+                if mes in val:
+                    val = val.replace(mes, num)
+                    break
+            val = val.replace("-", "/").replace(".", "/")
+            partes = val.split()
+            if len(partes) == 3 and all(any(c.isdigit() for c in p) for p in partes):
+                val = "/".join(partes)
+            fecha = pd.to_datetime(val, dayfirst=True, errors='raise')
+            return fecha.strftime("%d/%m/%Y"), True, ""
+
+        if isinstance(valor, (pd.Timestamp, datetime)):
+            return valor.strftime("%d/%m/%Y"), True, ""
+
+        fecha = pd.to_datetime(valor, dayfirst=True, errors='raise')
+        return fecha.strftime("%d/%m/%Y"), True, ""
+
+    except Exception as e:
+        return valor, False, f"Fecha inválida: {e}"
+    try:
+        if pd.isna(valor) or str(valor).strip() == "":
+            return "", True, ""
+
         if isinstance(valor, (pd.Timestamp, datetime)):
             return valor.strftime("%d/%m/%Y"), True, ""
 
@@ -97,12 +128,6 @@ def validar_fecha(valor):
         if pd.isna(valor) or str(valor).strip() == "":
             return "", True, ""
 
-        if isinstance(valor, str) and "00:00:00" in valor:
-            try:
-                fecha = pd.to_datetime(valor.strip().split()[0], format="%Y-%m-%d", errors='raise')
-                return fecha.strftime("%d/%m/%Y"), True, ""
-            except:
-                pass
         if isinstance(valor, (pd.Timestamp, datetime)):
             return valor.strftime("%d/%m/%Y"), True, ""
 
@@ -141,12 +166,6 @@ def validar_fecha_robusta(valor):
         if pd.isna(valor):
             return valor, True, ""
         
-        if isinstance(valor, str) and "00:00:00" in valor:
-            try:
-                fecha = pd.to_datetime(valor.strip().split()[0], format="%Y-%m-%d", errors='raise')
-                return fecha.strftime("%d/%m/%Y"), True, ""
-            except:
-                pass
         if isinstance(valor, (pd.Timestamp, datetime)):
             return valor.strftime("%d/%m/%Y"), True, ""
 
