@@ -185,15 +185,7 @@ if file:
                             cell.value = nuevo
 
                     elif normalizar(col_name) in ["odometro", "odometros"]:
-                        nuevo, ok, motivo = validar_entero(val)
-                        if not ok:
-                            cell.fill = fill_red
-                            cell.font = font_white
-                            errores.append((cell.row, encabezados[cell.column - 1], val, motivo))
-                        elif nuevo != val:
-                            corregidos.append((cell.row, encabezados[cell.column - 1], val, nuevo))
-                            cambios_por_columna[encabezados[cell.column - 1]] = cambios_por_columna.get(encabezados[cell.column - 1], 0) + 1
-                            cell.value = nuevo
+                        
                     elif normalizar(col_name) in valores_validos_extra:
                         nuevo, ok, motivo = validar_aproximado(val, valores_validos_extra[normalizar(col_name)])
                         if not ok:
@@ -241,7 +233,7 @@ if file:
         vista_df = pd.DataFrame(vista_previa, columns=["Fila", "Columna", "Valor original", "Valor corregido"])
         st.dataframe(vista_df)
         else:
-            st.info("No se realizaron correcciones automáticas.")
+        st.info("No se realizaron correcciones automáticas.")
 
     if errores:
         log_ws = wb.create_sheet("Log de Errores")
