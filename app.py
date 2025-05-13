@@ -50,6 +50,8 @@ if file:
     header_row = df[df.apply(lambda row: row.astype(str).str.contains("Dominio").any(), axis=1)].index[0]
     df = pd.read_excel(file, header=header_row)
 
+    df_original = df.copy()  # Para comparación
+
     # Correcciones manuales
     correcciones_manual = {
         "Titularidad": {"Mio": "Propio"},
@@ -97,6 +99,24 @@ if file:
         if col in df.columns:
             df[col] = df[col].apply(lambda x: "" if pd.isna(x) else x)
 
+    # Comparar cambios
+    cambios = (df != df_original) & ~(df.isna() & df_original.isna())
+    total_cambios = cambios.sum().sum()
+    columnas_con_cambios = cambios.sum()
+    resumen_cambios = df_original[cambios].copy()
+    resumen_cambios_nuevo = df[cambios].copy()
+    resumen = pd.DataFrame({
+        'Valor original': resumen_cambios.stack(),
+        'Valor corregido': resumen_cambios_nuevo.stack()
+    })
+
+    with st.expander("📋 Ver resumen de cambios detectados"):
+        st.write(f"🔧 Total de celdas corregidas: **{total_cambios}**")
+        st.dataframe(columnas_con_cambios[columnas_con_cambios > 0])
+        if total_cambios > 0:
+            st.markdown("### 📝 Cambios realizados")
+            st.dataframe(resumen)
+
     # Descargar archivo corregido
     output = BytesIO()
     df.to_excel(output, index=False)
@@ -109,3 +129,4 @@ if file:
     )
 
     st.success("Archivo procesado correctamente.")
+
