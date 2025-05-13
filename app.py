@@ -185,8 +185,15 @@ if file:
                             cell.value = nuevo
 
                     elif normalizar(col_name) in ["odometro", "odometros"]:
-                        
-                    elif normalizar(col_name) in valores_validos_extra:
+                        nuevo, ok, motivo = validar_entero(val)
+                        if not ok:
+                            cell.fill = fill_red
+                            cell.font = font_white
+                            errores.append((cell.row, encabezados[cell.column - 1], val, motivo))
+                        elif nuevo != val:
+                            corregidos.append((cell.row, encabezados[cell.column - 1], val, nuevo))
+                            cambios_por_columna[encabezados[cell.column - 1]] = cambios_por_columna.get(encabezados[cell.column - 1], 0) + 1
+                            cell.value = nuevoelif normalizar(col_name) in valores_validos_extra:
                         nuevo, ok, motivo = validar_aproximado(val, valores_validos_extra[normalizar(col_name)])
                         if not ok:
                             cell.fill = fill_red
