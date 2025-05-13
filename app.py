@@ -240,7 +240,7 @@ if file:
         vista_previa = errores + corregidos
         vista_df = pd.DataFrame(vista_previa, columns=["Fila", "Columna", "Valor original", "Valor corregido"])
         st.dataframe(vista_df)
-        else:
+    else:
         st.info("No se realizaron correcciones automáticas.")
 
     if errores:
