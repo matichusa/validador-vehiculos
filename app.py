@@ -38,17 +38,30 @@ def validar_fecha(valor):
         if isinstance(valor, str):
             valor = valor.strip().lower().replace(" del ", " ").replace(" de ", " ")
             meses = {
-                "enero": "01", "febrero": "02", "marzo": "03", "abril": "04",
-                "mayo": "05", "junio": "06", "julio": "07", "agosto": "08",
-                "septiembre": "09", "octubre": "10", "noviembre": "11", "diciembre": "12"
+                "enero": "01", "ene": "01", "january": "01", "jan": "01",
+                "febrero": "02", "feb": "02", "february": "02",
+                "marzo": "03", "mar": "03", "march": "03",
+                "abril": "04", "apr": "04", "april": "04",
+                "mayo": "05", "may": "05",
+                "junio": "06", "jun": "06", "june": "06",
+                "julio": "07", "jul": "07", "july": "07",
+                "agosto": "08", "aug": "08", "august": "08",
+                "septiembre": "09", "sep": "09", "sept": "09", "september": "09",
+                "octubre": "10", "oct": "10", "october": "10",
+                "noviembre": "11", "nov": "11", "november": "11",
+                "diciembre": "12", "dic": "12", "dec": "12", "december": "12"
             }
             for mes, num in meses.items():
                 if mes in valor:
-                    partes = valor.replace(mes, num).replace(" ", "/").split("/")
+                    limpio = valor.replace(mes, num).replace(" ", "/").replace("-", "/").replace(".", "/")
+                    partes = limpio.split("/")
                     if len(partes) == 2:
                         partes.insert(0, "01")
                         sugerencia = "/".join(partes)
                         valor = sugerencia
+                        break
+                    elif len(partes) == 3:
+                        valor = "/".join(partes)
                         break
             else:
                 if "/" in valor or "-" in valor:
@@ -57,7 +70,6 @@ def validar_fecha(valor):
                         partes.insert(0, "01")
                         sugerencia = "/".join(partes)
                         valor = sugerencia
-
         fecha = pd.to_datetime(valor, dayfirst=True, errors='raise')
         return fecha.strftime("%d/%m/%Y"), True, ""
     except Exception:
@@ -125,16 +137,19 @@ if file:
                     cambios_por_columna[encabezados[cell.column - 1]] = cambios_por_columna.get(encabezados[cell.column - 1], 0) + 1
                     cell.value = nuevo
 
-            elif col_name in valores_validos:
-                nuevo, ok, motivo = validar_aproximado(val, valores_validos[col_name])
-                if not ok:
-                    cell.fill = fill_red
-                    cell.font = font_white
-                    errores.append((cell.row, encabezados[cell.column - 1], val, motivo))
-                elif nuevo != val:
-                    corregidos.append((cell.row, encabezados[cell.column - 1], val, nuevo))
-                    cambios_por_columna[encabezados[cell.column - 1]] = cambios_por_columna.get(encabezados[cell.column - 1], 0) + 1
-                    cell.value = nuevo
+            else:
+                for clave_validada in valores_validos:
+                    if normalizar(col_name) == normalizar(clave_validada):
+                        nuevo, ok, motivo = validar_aproximado(val, valores_validos[clave_validada])
+                        if not ok:
+                            cell.fill = fill_red
+                            cell.font = font_white
+                            errores.append((cell.row, encabezados[cell.column - 1], val, motivo))
+                        elif nuevo != val:
+                            corregidos.append((cell.row, encabezados[cell.column - 1], val, nuevo))
+                            cambios_por_columna[encabezados[cell.column - 1]] = cambios_por_columna.get(encabezados[cell.column - 1], 0) + 1
+                            cell.value = nuevo
+                        break
 
             elif col_name in columnas_fecha:
                 nuevo, ok, motivo = validar_fecha(val)
