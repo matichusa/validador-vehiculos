@@ -6,6 +6,9 @@ import pandas as pd
 import numpy as np
 from io import BytesIO
 from difflib import get_close_matches
+from openpyxl import load_workbook
+from openpyxl.styles import Font, PatternFill
+from openpyxl.utils.dataframe import dataframe_to_rows
 
 # ---------------- Funciones de validación ----------------
 def limpiar_dominio(valor):
@@ -18,13 +21,13 @@ def validar_aproximado(valor, opciones):
         return np.nan
     valor_str = str(valor).strip().title()
     match = get_close_matches(valor_str, opciones, n=1, cutoff=0.75)
-    return match[0] if match else np.nan
+    return match[0] if match else "NO CORREGIDO"
 
 def validar_entero(valor):
     try:
         return int(float(valor)) if not pd.isna(valor) else np.nan
     except:
-        return np.nan
+        return "NO CORREGIDO"
 
 def validar_fecha(valor):
     if pd.isna(valor):
@@ -32,7 +35,7 @@ def validar_fecha(valor):
     try:
         return pd.to_datetime(valor).strftime("%d/%m/%Y")
     except:
-        return np.nan
+        return "NO CORREGIDO"
 
 def convertir_a_titulo(valor):
     if pd.isna(valor):
@@ -110,20 +113,58 @@ if file:
         'Valor corregido': resumen_cambios_nuevo.stack()
     })
 
+    errores_no_corregidos = resumen[resumen['Valor corregido'] == "NO CORREGIDO"]
+    resumen_ok = resumen[resumen['Valor corregido'] != "NO CORREGIDO"]
+
     with st.expander("📋 Ver resumen de cambios detectados"):
+        if not errores_no_corregidos.empty:
+            st.markdown("### ⚠️ Cambios no corregidos")
+            st.dataframe(errores_no_corregidos)
+
         st.write(f"🔧 Total de celdas corregidas: **{total_cambios}**")
         st.dataframe(columnas_con_cambios[columnas_con_cambios > 0])
-        if total_cambios > 0:
-            st.markdown("### 📝 Cambios realizados")
-            st.dataframe(resumen)
+        if not resumen_ok.empty:
+            st.markdown("### ✅ Cambios realizados")
+            st.dataframe(resumen_ok)
 
-    # Descargar archivo corregido
+            # Agregar botón para descargar el log de cambios
+            output_log = BytesIO()
+            resumen.to_excel(output_log)
+            output_log.seek(0)
+            st.download_button(
+                label="Descargar log de cambios",
+                data=output_log,
+                file_name="log_cambios.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+
+    # Descargar archivo corregido con formato y hoja adicional de log
     output = BytesIO()
     df.to_excel(output, index=False)
     output.seek(0)
+    wb = load_workbook(filename=output)
+    ws = wb.active
+
+    # Marcar errores en hoja principal
+    for (idx, row), (colname, coldata) in zip(enumerate(df.iterrows(), start=2), df.items()):
+        for col_index, val in enumerate(row[1], start=1):
+            if val == "NO CORREGIDO":
+                cell = ws.cell(row=idx, column=col_index)
+                cell.fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
+                cell.font = Font(color="FFFFFF", bold=True)
+
+    # Agregar hoja con el resumen de cambios
+    ws_log = wb.create_sheet(title="Log de Cambios")
+    for r in dataframe_to_rows(resumen.reset_index(), index=False, header=True):
+        ws_log.append(r)
+
+    corrected_output = BytesIO()
+    wb.save(corrected_output)
+    corrected_output.seek(0)
+
     st.download_button(
         label="Descargar archivo corregido",
-        data=output,
+        data=corrected_output,
         file_name="vehiculos_corregido.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
