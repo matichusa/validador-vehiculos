@@ -98,7 +98,7 @@ valores_validos_extra = {
     "marca": ["Toyota", "Volkswagen", "Renault", "Ford", "Chevrolet", "Fiat", "Peugeot", "Nissan", "Honda", "Citroën"],
     "modelo": ["Hilux", "Amarok", "Kangoo", "Ranger", "Onix", "Cronos", "208", "Frontier", "Civic", "C3"],
     "categoria": ["Sedán", "Pick-Up", "SUV", "Utilitario", "Hatchback", "Familiar"]
-}]
+}
 
 # ---------------- App Streamlit ----------------
 st.title("Validador de Archivo Excel - Estética Original")
