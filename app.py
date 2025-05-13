@@ -193,7 +193,8 @@ if file:
                         elif nuevo != val:
                             corregidos.append((cell.row, encabezados[cell.column - 1], val, nuevo))
                             cambios_por_columna[encabezados[cell.column - 1]] = cambios_por_columna.get(encabezados[cell.column - 1], 0) + 1
-                            cell.value = nuevoelif normalizar(col_name) in valores_validos_extra:
+                            cell.value = nuevo
+                    elif normalizar(col_name) in valores_validos_extra:
                         nuevo, ok, motivo = validar_aproximado(val, valores_validos_extra[normalizar(col_name)])
                         if not ok:
                             cell.fill = fill_red
