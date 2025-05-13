@@ -7,6 +7,13 @@ from openpyxl import load_workbook
 from openpyxl.styles import PatternFill, Font
 
 # ---------------- Funciones de validación ----------------
+import unicodedata
+
+def normalizar_columna(nombre):
+    if not isinstance(nombre, str):
+        return ""
+    nombre = unicodedata.normalize("NFKD", nombre).encode("ascii", "ignore").decode("utf-8")
+    return nombre.strip().lower()
 def limpiar_dominio(valor):
     if not isinstance(valor, str):
         return valor
@@ -82,9 +89,9 @@ file = st.file_uploader("Subí tu archivo de Excel para validar y corregir los d
 if file:
     wb = load_workbook(file)
     ws = wb.active
-    encabezado = [str(c.value).strip() if c.value else "" for c in ws[6]]
 
-    encabezado = [str(c.value).strip() if c.value else "" for c in ws[1]]
+    encabezado = [str(c.value).strip() if c.value else "" for c in ws[6]]
+    encabezado_normalizado = [normalizar_columna(c) for c in encabezado]
     errores = []
     corregidos = []
     cambios_por_columna = {}
@@ -92,9 +99,9 @@ if file:
     fill_red = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
     font_white = Font(color="FFFFFF", bold=True)
 
-    for row in ws.iter_rows(min_row=7, max_row=ws.max_row, max_col=len(encabezado)):
+    for row in ws.iter_rows(min_row=2, max_row=ws.max_row, max_col=len(encabezado)):
         for cell in row:
-            col = encabezado[cell.column - 1].lower()
+            col = encabezado_normalizado[cell.column - 1]
             original = cell.value
             nuevo = original
             ok = True
