@@ -49,11 +49,12 @@ if file:
     wb = load_workbook(file)
     ws = wb[wb.sheetnames[0]]
 
-    encabezados = [cell.value for cell in ws[7]]  # Fila 8 (indexada desde 1)
+    encabezados = [cell.value for cell in ws[7]]
     col_map = {col: idx for idx, col in enumerate(encabezados)}
 
     errores = []
     corregidos = []
+    cambios_por_columna = {}
     fill_red = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
     font_white = Font(color="FFFFFF", bold=True)
 
@@ -67,6 +68,7 @@ if file:
                 nuevo = limpiar_dominio(val)
                 if nuevo != val:
                     corregidos.append((cell.row, col_name, val, nuevo))
+                    cambios_por_columna[col_name] = cambios_por_columna.get(col_name, 0) + 1
                     cell.value = nuevo
 
             elif col_name in valores_validos:
@@ -77,6 +79,7 @@ if file:
                     errores.append((cell.row, col_name, val, motivo))
                 elif nuevo != val:
                     corregidos.append((cell.row, col_name, val, nuevo))
+                    cambios_por_columna[col_name] = cambios_por_columna.get(col_name, 0) + 1
                     cell.value = nuevo
 
             elif col_name in columnas_fecha:
@@ -87,6 +90,7 @@ if file:
                     errores.append((cell.row, col_name, val, motivo))
                 elif nuevo != val:
                     corregidos.append((cell.row, col_name, val, nuevo))
+                    cambios_por_columna[col_name] = cambios_por_columna.get(col_name, 0) + 1
                     cell.value = nuevo
 
             elif col_name == "Odómetro":
@@ -97,23 +101,40 @@ if file:
                     errores.append((cell.row, col_name, val, motivo))
                 elif nuevo != val:
                     corregidos.append((cell.row, col_name, val, nuevo))
+                    cambios_por_columna[col_name] = cambios_por_columna.get(col_name, 0) + 1
                     cell.value = nuevo
 
-    # Mostrar resumen de errores y correcciones
-    if errores:
-        st.markdown("### ❌ Valores no corregidos")
-        st.dataframe(pd.DataFrame(errores, columns=["Fila", "Columna", "Valor original", "Observación"]))
+    st.markdown(f"### 📊 Resumen general")
+    st.info(f"Se detectaron **{len(errores)} errores** y se corrigieron automáticamente **{len(corregidos)} valores**.")
 
-    if corregidos:
-        st.markdown("### ✅ Valores corregidos automáticamente")
-        st.dataframe(pd.DataFrame(corregidos, columns=["Fila", "Columna", "Valor original", "Valor corregido"]))
+    with st.expander("📋 Ver resumen de cambios detectados"):
+        if errores:
+            st.markdown("### ⚠️ Cambios no corregidos")
+            st.dataframe(pd.DataFrame(errores, columns=["Fila", "Columna", "Valor original", "Observación"]))
+        else:
+            st.info("No se detectaron errores no corregibles.")
 
-    # Agregar hoja log de errores
+        st.markdown("### ✅ Cambios realizados")
+        if corregidos:
+            st.markdown(f"🔢 Total de celdas corregidas: **{len(corregidos)}**")
+            st.markdown("📊 Cambios por columna:")
+            st.dataframe(pd.DataFrame.from_dict(cambios_por_columna, orient="index", columns=["Cantidad de cambios"]))
+            st.markdown("📝 Detalle de cambios:")
+            st.dataframe(pd.DataFrame(corregidos, columns=["Fila", "Columna", "Valor original", "Valor corregido"]))
+        else:
+            st.info("No se realizaron correcciones automáticas.")
+
     if errores:
         log_ws = wb.create_sheet("Log de Errores")
         log_ws.append(["Fila", "Columna", "Valor original", "Observación"])
         for fila, columna, valor, observacion in errores:
             log_ws.append([fila, columna, valor, observacion])
+
+    if corregidos:
+        resumen_ws = wb.create_sheet("Resumen de Cambios")
+        resumen_ws.append(["Fila", "Columna", "Valor original", "Valor corregido"])
+        for fila, columna, original, nuevo in corregidos:
+            resumen_ws.append([fila, columna, original, nuevo])
 
     output = BytesIO()
     wb.save(output)
@@ -126,6 +147,4 @@ if file:
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
-    st.success("Archivo validado conservando su estética. Se agregó una hoja con el log de errores si se detectaron.")
-
-
+    st.success("Archivo validado conservando su estética. Se agregaron hojas con log de errores y resumen de cambios si se detectaron.")
