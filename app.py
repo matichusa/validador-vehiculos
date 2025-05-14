@@ -53,7 +53,7 @@ if file:
     wb = load_workbook(file)
     ws = wb.active
 
-    encabezados = [cell.value for cell in next(ws.iter_rows(min_row=1, max_row=1))]
+    encabezados = [cell.value for cell in next(ws.iter_rows(min_row=6, max_row=6))]
     encabezados_norm = [normalizar(e) for e in encabezados]
 
     errores = []
@@ -68,7 +68,7 @@ if file:
         "vto gnc", "vto cilindro gnc", "vto senasa"
     ]
 
-    for row in ws.iter_rows(min_row=2):
+    for row in ws.iter_rows(min_row=7):
         for cell in row:
             col_idx = cell.column - 1
             col_name = encabezados_norm[col_idx]
